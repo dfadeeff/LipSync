@@ -5,7 +5,9 @@ from omegaconf import OmegaConf
 import argparse
 from datetime import datetime
 
-CONFIG_PATH = Path("configs/unet/stage2_512.yaml")
+#CONFIG_PATH = Path("configs/unet/stage2_512.yaml") #version 1.6
+#CONFIG_PATH = Path("configs/unet/stage2.yaml") #version 1.5
+CONFIG_PATH = Path("configs/unet/stage2_efficient.yaml") #version 1.5 efficient
 CHECKPOINT_PATH = Path("checkpoints/latentsync_unet.pt")
 
 
