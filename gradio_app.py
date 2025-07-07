@@ -4,6 +4,19 @@ from scripts.inference import main
 from omegaconf import OmegaConf
 import argparse
 from datetime import datetime
+import os
+import torch
+import gc
+
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+def clear_gpu_memory():
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.set_per_process_memory_fraction(0.7, device=0)
+
+
 
 #CONFIG_PATH = Path("configs/unet/stage2_512.yaml") #version 1.6
 #CONFIG_PATH = Path("configs/unet/stage2.yaml") #version 1.5
