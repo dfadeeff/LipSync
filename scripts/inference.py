@@ -22,6 +22,7 @@ from latentsync.pipelines.lipsync_pipeline import LipsyncPipeline
 from accelerate.utils import set_seed
 from latentsync.whisper.audio2feature import Audio2Feature
 from DeepCache import DeepCacheSDHelper
+from torch.profiler import record_function as rf
 
 
 def main(config, args):
@@ -38,46 +39,55 @@ def main(config, args):
     print(f"Input audio path: {args.audio_path}")
     print(f"Loaded checkpoint path: {args.inference_ckpt_path}")
 
-    scheduler = DDIMScheduler.from_pretrained("configs")
+    
 
-    if config.model.cross_attention_dim == 768:
-        whisper_model_path = "checkpoints/whisper/small.pt"
-    elif config.model.cross_attention_dim == 384:
-        whisper_model_path = "checkpoints/whisper/tiny.pt"
-    else:
-        raise NotImplementedError("cross_attention_dim must be 768 or 384")
+    # ───────────────────────── COMPONENT 01 ─────────────────────────
+    with rf("01|init-components"):
+        scheduler = DDIMScheduler.from_pretrained("configs")
 
-    audio_encoder = Audio2Feature(
-        model_path=whisper_model_path,
-        device="cuda",
-        num_frames=config.data.num_frames,
-        audio_feat_length=config.data.audio_feat_length,
-    )
+        if config.model.cross_attention_dim == 768:
+            whisper_model_path = "checkpoints/whisper/small.pt"
+        elif config.model.cross_attention_dim == 384:
+            whisper_model_path = "checkpoints/whisper/tiny.pt"
+        else:
+            raise NotImplementedError("cross_attention_dim must be 768 or 384")
 
-    vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse", torch_dtype=dtype)
-    vae.config.scaling_factor = 0.18215
-    vae.config.shift_factor = 0
+        audio_encoder = Audio2Feature(
+            model_path=whisper_model_path,
+            device="cuda",
+            num_frames=config.data.num_frames,
+            audio_feat_length=config.data.audio_feat_length,
+        )
 
-    unet, _ = UNet3DConditionModel.from_pretrained(
-        OmegaConf.to_container(config.model),
-        args.inference_ckpt_path,
-        device="cpu",
-    )
+        vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse", torch_dtype=dtype)
+        vae.config.scaling_factor = 0.18215
+        vae.config.shift_factor = 0
 
-    unet = unet.to(dtype=dtype)
+        unet, _ = UNet3DConditionModel.from_pretrained(
+            OmegaConf.to_container(config.model),
+            args.inference_ckpt_path,
+            device="cpu",
+        )
 
-    pipeline = LipsyncPipeline(
-        vae=vae,
-        audio_encoder=audio_encoder,
-        unet=unet,
-        scheduler=scheduler,
-    ).to("cuda")
+        unet = unet.to(dtype=dtype)
+
+    # ───────────────────────── COMPONENT 02 ─────────────────────────
+    with rf("02|build-pipeline"):
+        pipeline = LipsyncPipeline(
+            vae=vae,
+            audio_encoder=audio_encoder,
+            unet=unet,
+            scheduler=scheduler,
+        ).to("cuda")
 
     # use DeepCache
-    if args.enable_deepcache:
-        helper = DeepCacheSDHelper(pipe=pipeline)
-        helper.set_params(cache_interval=3, cache_branch_id=0)
-        helper.enable()
+
+    # ───────────────────────── COMPONENT 03 ─────────────────────────
+    with rf("03|deepcache-setup"):
+        if args.enable_deepcache:
+            helper = DeepCacheSDHelper(pipe=pipeline)
+            helper.set_params(cache_interval=3, cache_branch_id=0)
+            helper.enable()
 
     if args.seed != -1:
         set_seed(args.seed)
@@ -86,19 +96,22 @@ def main(config, args):
 
     print(f"Initial seed: {torch.initial_seed()}")
 
-    pipeline(
-        video_path=args.video_path,
-        audio_path=args.audio_path,
-        video_out_path=args.video_out_path,
-        num_frames=config.data.num_frames,
-        num_inference_steps=args.inference_steps,
-        guidance_scale=args.guidance_scale,
-        weight_dtype=dtype,
-        width=config.data.resolution,
-        height=config.data.resolution,
-        mask_image_path=config.data.mask_image_path,
-        temp_dir=args.temp_dir,
-    )
+
+    # ───────────────────────── COMPONENT 04 ─────────────────────────
+    with rf("04|run-pipeline"):
+        pipeline(
+            video_path=args.video_path,
+            audio_path=args.audio_path,
+            video_out_path=args.video_out_path,
+            num_frames=config.data.num_frames,
+            num_inference_steps=args.inference_steps,
+            guidance_scale=args.guidance_scale,
+            weight_dtype=dtype,
+            width=config.data.resolution,
+            height=config.data.resolution,
+            mask_image_path=config.data.mask_image_path,
+            temp_dir=args.temp_dir,
+        )
 
 
 if __name__ == "__main__":
