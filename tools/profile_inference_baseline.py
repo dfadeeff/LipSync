@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 """
 Profile LatentSync end-to-end (speed, memory, quality).
-
-Example:
+Usage example:
     python tools/profile_inference.py assets/demo1_video.mp4 assets/demo1_audio.wav \
            --steps 20 --scale 1.5
 """
 
-import types
 import argparse, contextlib, sys
 from pathlib import Path
-import cv2, numpy as np
-from skimage.metrics import peak_signal_noise_ratio as psnr, structural_similarity as ssim
-import torch
-import functools
-from omegaconf import OmegaConf
-from torch.profiler import (
-    profile, record_function, ProfilerActivity, 
-    tensorboard_trace_handler
-)
-    
 
+import cv2, numpy as np
+import torch
+from omegaconf import OmegaConf
+from skimage.metrics import peak_signal_noise_ratio as psnr, structural_similarity as ssim
+from torch.profiler import (profile, record_function, ProfilerActivity,
+                            tensorboard_trace_handler)
 
 # ───────── repository imports ─────────
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,60 +27,70 @@ from gradio_app        import CONFIG_PATH, create_args, clear_gpu_memory
 LOG_DIR = Path("logs/latentsync_prof")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+# -----------------------------------------------------------------------------#
+# helpers                                                                      #
+# -----------------------------------------------------------------------------#
 
 
 def label(name):
     """record_function if CUDA is on, else no-op."""
     return record_function(name) if torch.cuda.is_available() else contextlib.nullcontext()
 
-# ───────── one-shot profiler ─────────
-def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1247) -> None:
+# -----------------------------------------------------------------------------#
+# main profiler wrapper                                                        #
+# -----------------------------------------------------------------------------#
+def profiled_run(video: str, audio: str,
+                 steps: int, scale: float, seed: int = 1247) -> None:
 
-    # recreate cfg & argparse.Namespace exactly like the Gradio front-end
-    cfg = OmegaConf.load(CONFIG_PATH)
+    # mimic your Gradio front-end
+    cfg  = OmegaConf.load(CONFIG_PATH)
     cfg.run.inference_steps = steps
     cfg.run.guidance_scale  = scale
 
-    out_dir = Path("temp"); out_dir.mkdir(exist_ok=True)
+    out_dir = Path("temp");  out_dir.mkdir(exist_ok=True)
     out_mp4 = out_dir / f"{Path(video).stem}_profiled.mp4"
     args    = create_args(video, audio, str(out_mp4), steps, scale, seed)
 
     clear_gpu_memory()
     torch.cuda.reset_peak_memory_stats()
 
-    # --- torch profiler ------------------------------------------------------
+    # ------------------- profiler -------------------------------------------
     prof = profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        
         record_shapes=True,
         profile_memory=True,
         with_stack=False,
         on_trace_ready=tensorboard_trace_handler(str(LOG_DIR), use_gzip=True)
-)
+    )
 
-    with prof:                                  #   step 0  →  ACTIVE
+    with prof:
         with label("00|full-pipeline"):
             run_inference(cfg, args)
-        
 
-
-    # --- console summary -----------------------------------------------------
-    print("\n═════ TOP-20 ops by CUDA time ═════")
-    print(prof.key_averages(group_by_input_shape=False)
-              .table(sort_by="self_cuda_time_total", row_limit=20))
+    # ------------------- TOP-20 ---------------------------------------------
+    print("\n═════ TOP-20 ops by self-CUDA time ═════")
+    # print(prof.key_averages(group_by_input_shape=False)
+    #           .table(sort_by="self_cuda_time_total", row_limit=20))
+    events = prof.key_averages(group_by_input_shape=False)
+    top = sorted(events, key=lambda e: getattr(e, "self_cuda_time_total", 0.0),
+             reverse=True)[:20]
     
+    # Pretty print – widths tweaked so it fits an 80-column terminal
+    for ev in top:
+        cuda_ms = ev.self_cuda_time_total / 1e3
+        cpu_ms  = ev.self_cpu_time_total  / 1e3
+        print(f"{ev.key[:40]:40s}  {cuda_ms:9.2f}  {cpu_ms:9.2f}  {ev.count:5d}")
 
 
+    # ------------------- GPU memory -----------------------------------------
     if torch.cuda.is_available():
-        print(f"\nPeak CUDA allocated : {torch.cuda.max_memory_allocated() / 1e9:6.2f} GB")
-        print(f"Peak CUDA reserved  : {torch.cuda.max_memory_reserved()  / 1e9:6.2f} GB")
+        print(f"\nPeak CUDA allocated : {torch.cuda.max_memory_allocated()/1e9:6.2f} GB")
+        print(f"Peak CUDA reserved  : {torch.cuda.max_memory_reserved()/1e9:6.2f} GB")
 
-    print(f"\nTrace saved under {LOG_DIR}  "
-          f"(TensorBoard → Profiler tab, run dropdown).")
+    print(f"\nTrace saved under {LOG_DIR}  (open in TensorBoard → Profiler tab)")
 
-    # --- quick quality check -------------------------------------------------
+    # ------------------- quick quality check --------------------------------
     try:
-
         def _quality(ref, gen, max_frames=100):
             cr, cg = cv2.VideoCapture(ref), cv2.VideoCapture(gen)
             n = int(min(cr.get(cv2.CAP_PROP_FRAME_COUNT),
@@ -104,22 +108,25 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
 
         p, s, n = _quality(video, str(out_mp4))
         print(f"\nQuality on {n} frames →  PSNR {p:5.2f} dB   SSIM {s:0.4f}")
-
     except Exception as e:
-        print(f"\n[quality skipped] {e}")
+        print(f"\n[quality check skipped] {e}")
 
     print(f"\nOutput video → {out_mp4}\n")
 
-# ───────── CLI wrapper ─────────
+# -----------------------------------------------------------------------------#
+# CLI                                                                          #
+# -----------------------------------------------------------------------------#
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
-    cli.add_argument("video"), cli.add_argument("audio")
-    cli.add_argument("--steps",  type=int,   default=20)
-    cli.add_argument("--scale",  type=float, default=1.5)
-    cli.add_argument("--seed",   type=int,   default=1247)
+    cli.add_argument("video");  cli.add_argument("audio")
+    cli.add_argument("--steps", type=int,   default=20)
+    cli.add_argument("--scale", type=float, default=1.5)
+    cli.add_argument("--seed",  type=int,   default=1247)
     opt = cli.parse_args()
 
-    assert Path(opt.video ).exists(), f"Video not found: {opt.video}"
-    assert Path(opt.audio ).exists(), f"Audio not found: {opt.audio}"
+    if not Path(opt.video).exists():
+        sys.exit(f"Video not found: {opt.video}")
+    if not Path(opt.audio).exists():
+        sys.exit(f"Audio not found: {opt.audio}")
 
     profiled_run(opt.video, opt.audio, opt.steps, opt.scale, opt.seed)
