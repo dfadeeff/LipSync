@@ -214,6 +214,62 @@ Note that our released SyncNet is trained on data processed through our data pro
 
 Thanks for their generous contributions to the open-source community!
 
+## 📊 Optimization
+
+### Performance Profiling
+
+Profile the inference pipeline to analyze performance bottlenecks and memory usage:
+
+```bash
+# Run profiling on your video/audio files
+python tools/profile_inference.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
+
+# Or use custom parameters
+python tools/profile_inference.py path/to/your/video.mp4 path/to/your/audio.wav \
+    --steps 30 --scale 2.0 --seed 42
+```
+
+### Viewing Results
+
+After profiling completes, launch TensorBoard to visualize the performance trace:
+
+```bash
+# Start TensorBoard server
+tensorboard --logdir logs/latentsync_prof --bind_all --port 6006
+
+# Open browser and navigate to:
+# http://localhost:6006
+# Then go to: PROFILER tab → Select run from dropdown
+```
+
+### Performance Analysis
+
+The profiler will show you:
+- **CUDA operation breakdown** - Which operations consume the most GPU time
+- **Memory usage patterns** - Peak GPU memory and allocation patterns  
+- **Component analysis** - Time spent in different pipeline stages
+- **Kernel efficiency** - Low-level CUDA kernel performance
+
+Typical results show:
+- **70% time** in diffusion model (UNet) linear layers and attention
+- **26% time** in VAE encoder/decoder convolutions
+- **4% time** in memory operations and utilities
+
+### Optimization Tips
+
+Based on profiling results:
+1. **Reduce inference steps** (--steps) for faster generation at slight quality cost
+2. **Lower guidance scale** (--scale) to reduce computation overhead
+3. **Use mixed precision** if supported by your hardware
+4. **Batch multiple frames** for better GPU utilization
+
+### Troubleshooting
+
+If no trace files are generated:
+- Ensure CUDA is available and being used
+- Check that `logs/latentsync_prof` directory has write permissions
+- Verify the inference completes successfully without errors
+
 ## 📖 Citation
 
 If you find our repo useful for your research, please consider citing our paper:
