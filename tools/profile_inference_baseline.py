@@ -7,18 +7,20 @@ Example:
            --steps 20 --scale 1.5
 """
 
+import types
 import argparse, contextlib, sys
 from pathlib import Path
 import cv2, numpy as np
-from skimage.metrics import peak_signal_noise_ratio as psnr
-from skimage.metrics import structural_similarity   as ssim
+from skimage.metrics import peak_signal_noise_ratio as psnr, structural_similarity as ssim
 import torch
 import functools
 from omegaconf import OmegaConf
 from torch.profiler import (
-    profile, record_function, ProfilerActivity, schedule,
+    profile, record_function, ProfilerActivity, 
     tensorboard_trace_handler
 )
+    
+
 
 # ───────── repository imports ─────────
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +32,8 @@ from gradio_app        import CONFIG_PATH, create_args, clear_gpu_memory
 
 LOG_DIR = Path("logs/latentsync_prof")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+
 
 def label(name):
     """record_function if CUDA is on, else no-op."""
@@ -53,6 +57,7 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
     # --- torch profiler ------------------------------------------------------
     prof = profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        
         record_shapes=True,
         profile_memory=True,
         with_stack=False,
@@ -62,31 +67,15 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
     with prof:                                  #   step 0  →  ACTIVE
         with label("00|full-pipeline"):
             run_inference(cfg, args)
+        
 
 
     # --- console summary -----------------------------------------------------
     print("\n═════ TOP-20 ops by CUDA time ═════")
     print(prof.key_averages(group_by_input_shape=False)
               .table(sort_by="self_cuda_time_total", row_limit=20))
-    print("\n═════ HIGH-LEVEL rf() scopes (sorted by CUDA time) ═════")
+    
 
-
-
-    # keep only the events whose name contains our "|" tags
-    scopes = prof.key_averages(group_by_input_shape=False)
-    scopes = [e for e in scopes if "|" in e.key]      
-
-    # pretty-print, aggregated by children kernels
-    for evt in sorted(scopes,
-                   key=lambda e: e.cuda_time_total,
-                   reverse=True):
-        # evt.cuda_time_total is in μs; convert to seconds
-        cuda_s  = evt.cuda_time_total / 1e6
-        cpu_s   = evt.cpu_time_total  / 1e6
-        print(f"{evt.key:<25}  CUDA {cuda_s:8.3f}s   "
-            f"CPU {cpu_s:8.3f}s   calls {evt.count:3d}")
-        
-        
 
     if torch.cuda.is_available():
         print(f"\nPeak CUDA allocated : {torch.cuda.max_memory_allocated() / 1e9:6.2f} GB")
@@ -97,7 +86,6 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
 
     # --- quick quality check -------------------------------------------------
     try:
-
 
         def _quality(ref, gen, max_frames=100):
             cr, cg = cv2.VideoCapture(ref), cv2.VideoCapture(gen)

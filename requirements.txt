@@ -25,4 +25,3 @@ insightface==0.7.3
 onnxruntime-gpu==1.21.0
 DeepCache==0.1.1
 tensorboard==2.15
-scikit-image==0.23.2
