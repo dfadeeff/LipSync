@@ -9,7 +9,9 @@ Example:
 
 import argparse, contextlib, sys
 from pathlib import Path
-
+import cv2, numpy as np
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import structural_similarity   as ssim
 import torch
 import functools
 from omegaconf import OmegaConf
@@ -71,9 +73,10 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
 
 
     # keep only the events whose name contains our "|" tags
-    scopes = [evt for evt in prof.key_averages() if "|" in evt.key]                     # ← all your rf() labels
+    scopes = prof.key_averages(group_by_input_shape=False)
+    scopes = [e for e in scopes if "|" in e.key]      
 
-    # pretty-print them, aggregated by children kernels
+    # pretty-print, aggregated by children kernels
     for evt in sorted(scopes,
                    key=lambda e: e.cuda_time_total,
                    reverse=True):
@@ -94,9 +97,7 @@ def profiled_run(video: str, audio: str, steps: int, scale: float, seed: int = 1
 
     # --- quick quality check -------------------------------------------------
     try:
-        import cv2, numpy as np
-        from skimage.metrics import peak_signal_noise_ratio as psnr
-        from skimage.metrics import structural_similarity   as ssim
+
 
         def _quality(ref, gen, max_frames=100):
             cr, cg = cv2.VideoCapture(ref), cv2.VideoCapture(gen)
