@@ -16,7 +16,7 @@ import argparse
 import os
 from omegaconf import OmegaConf
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import torch
 torch.backends.cuda.matmul.allow_tf32 = True
 from diffusers import AutoencoderKL, DDIMScheduler
@@ -27,6 +27,8 @@ from latentsync.whisper.audio2feature import Audio2Feature
 from DeepCache import DeepCacheSDHelper
 from torch.profiler import record_function as rf
 from torch.amp import autocast
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def main(config, args):
     if not os.path.exists(args.video_path):
