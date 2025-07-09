@@ -339,6 +339,7 @@ class LipsyncPipeline(DiffusionPipeline):
 
         # 0. Define call parameters
         device = self._execution_device
+        
         mask_image = load_fixed_mask(height, mask_image_path)
         self.image_processor = ImageProcessor(height, device="cuda", mask_image=mask_image)
         self.set_progress_bar_config(desc=f"Sample frames: {num_frames}")
@@ -469,6 +470,7 @@ class LipsyncPipeline(DiffusionPipeline):
 
 
         with rf("05|restore-faces"):
+            torch.cuda.empty_cache()
             synced_video_frames = self.restore_video(torch.cat(synced_video_frames), video_frames, boxes, affine_matrices)
 
         
