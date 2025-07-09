@@ -229,7 +229,7 @@ python tools/profile_inference_baseline.py assets/demo1_video.mp4 assets/demo1_a
 python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
 
 # Run example from root directory
-python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav        --steps 20 --scale 1.5
+python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav  --steps 20 --scale 1.5
 
 ```
 
