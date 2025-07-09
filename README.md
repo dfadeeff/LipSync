@@ -221,12 +221,16 @@ Thanks for their generous contributions to the open-source community!
 Profile the inference pipeline to analyze performance bottlenecks and memory usage:
 
 ```bash
-# Run profiling on your video/audio files
-python tools/profile_inference.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
+# Run profiling on your video/audio files for baseline
+python tools/profile_inference_baseline.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
 
-# Or use custom parameters
-python tools/profile_inference.py path/to/your/video.mp4 path/to/your/audio.wav \
-    --steps 30 --scale 2.0 --seed 42
+
+# Run profiling on your video/audio files for optimized version
+python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
+
+# Run example from root directory
+python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav        --steps 20 --scale 1.5
+
 ```
 
 ### Viewing Results
