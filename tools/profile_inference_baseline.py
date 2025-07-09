@@ -69,17 +69,9 @@ def profiled_run(video: str, audio: str,
 
     # ------------------- TOP-20 ---------------------------------------------
     print("\n═════ TOP-20 ops by self-CUDA time ═════")
-    # print(prof.key_averages(group_by_input_shape=False)
-    #           .table(sort_by="self_cuda_time_total", row_limit=20))
-    events = prof.key_averages(group_by_input_shape=False)
-    top = sorted(events, key=lambda e: getattr(e, "self_cuda_time_total", 0.0),
-             reverse=True)[:20]
-    
-    # Pretty print – widths tweaked so it fits an 80-column terminal
-    for ev in top:
-        cuda_ms = ev.self_cuda_time_total / 1e3
-        cpu_ms  = ev.self_cpu_time_total  / 1e3
-        print(f"{ev.key[:40]:40s}  {cuda_ms:9.2f}  {cpu_ms:9.2f}  {ev.count:5d}")
+    print(prof.key_averages(group_by_input_shape=False)
+              .table(sort_by="self_cuda_time_total", row_limit=20))
+
 
 
     # ------------------- GPU memory -----------------------------------------
