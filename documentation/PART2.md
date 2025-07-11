@@ -52,6 +52,53 @@ The experiment successfully confirmed the hypothesis:
 
 **Conclusion**: Lip-sync quality can be quantitatively improved through post-processing video timing corrections, using StableSyncNet as a guide without model retraining.
 
+### 2.4 What the Improvement Actually Does
+
+The POC script creates a new video that is better timed than the original by correcting the small, natural timing errors that occur in any human speech performance.
+
+#### The Problem: Natural Timing Imperfections
+
+Consider a single moment in the video:
+- **The speaker makes an "oooo" sound**
+- **The speaker's lips form an "O" shape**
+
+In a perfect world, the frame containing the perfect "O" shape would align exactly with the audio chunk containing the "oooo" sound. In reality, the actor might form the "O" shape one frame too early or one frame too late.
+
+#### The Solution: Intelligent Frame Re-alignment
+
+Here's what the POC does for that single moment:
+
+**Step 1: Analyze Audio**
+- The script takes the audio chunk for time `t` (the "oooo" sound)
+- Uses StableSyncNet to create its audio fingerprint: `A(t)`
+
+**Step 2: Identify Candidates**
+- The script examines video frames in a small window around time `t`
+- Looks at frames from `t-3` to `t+3` (7 candidate frames)
+- Creates video fingerprints for each candidate: `V(t-3)`, `V(t-2)`, `V(t-1)`, `V(t)`, `V(t+1)`, `V(t+2)`, `V(t+3)`
+
+**Step 3: Find the Best Match**
+- Calculates the distance between audio fingerprint `A(t)` and each candidate video fingerprint:
+
+```
+Distance(A(t), V(t-3)) = 1.8
+Distance(A(t), V(t-2)) = 1.5
+Distance(A(t), V(t-1)) = 1.1  ← The Winner!
+Distance(A(t), V(t))   = 1.4  (Original alignment)
+Distance(A(t), V(t+1)) = 1.9
+Distance(A(t), V(t+2)) = 2.0
+Distance(A(t), V(t+3)) = 2.2
+```
+
+**Step 4: Select and Re-Time**
+- The script identifies that the video frame from time `t-1` is actually the best match for the audio at time `t`
+- For the new video, it selects the frame from `t-1` to be displayed at time `t`
+- **This process repeats for every single moment in the video**
+
+#### The Result
+
+The POC creates a new video where each frame is the optimal visual match for its corresponding audio moment, effectively "fixing" the natural timing imperfections that occurred during the original recording.
+
 ## 3. Baseline Measurement Results
 
 ### Original Video Performance
