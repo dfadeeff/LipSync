@@ -190,7 +190,7 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 
 ### 4.2 Component-Level Performance Analysis
 
-**Most Impacted Operations** (Test 3B vs Baseline):
+**Most Impacted Operations** (Test run with optimization vs Baseline):
 
 | Operation | Baseline Time | Optimized Time | Improvement |
 |-----------|---------------|----------------|-------------|
