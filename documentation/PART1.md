@@ -195,7 +195,6 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | Operation | Baseline Time | Optimized Time | Improvement |
 |-----------|---------------|----------------|-------------|
 | **UNet Diffusion** | 82.90s | 49.24s | **40.6% faster** |
-| **Face Alignment** | 34.99s | 34.64s | **1.0% faster** |
 | **GEMM Operations** | 41.34s | ~20s | **~50% faster** |
 | **Attention Mechanisms** | 9.07s | 5.36s | **40.9% faster** |
 
