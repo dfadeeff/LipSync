@@ -164,23 +164,23 @@ from gradio_app_opt import CONFIG_PATH, create_args, clear_gpu_memory
 python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
 ```
 
-| Metric | Baseline | Test 2 | Improvement |
+| Metric | Baseline Test 1 | Baseline Test 2 | Improvement |
 |--------|----------|--------|-------------|
-| **CPU Time** | 227.50s | 219.50s | 3.5% faster |
+| **CPU Time** | 227.50s | 219.50s | 3.5% faster (negligible) |
 | **CUDA Time** | 98.77s | 99.11s | ~No change |
 | **Peak Memory** | 11.24GB | 11.24GB | No change |
 
-#### **Test 3A: Advanced Optimizations**
+#### **Test Run 1: Advanced Optimizations**
 
-| Metric | Baseline | Test 3A | Improvement |
+| Metric | Baseline | Test Run 1 | Improvement |
 |--------|----------|---------|-------------|
 | **CPU Time** | 227.50s | 186.21s | **18.2% faster** |
 | **CUDA Time** | 98.77s | 55.56s | **43.7% faster** |
 | **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
 
-#### **Test 3B: Final Optimized Pipeline**
+#### **Test Run 2: Advanced Optimizations**
 
-| Metric | Baseline | Test 3B | Improvement |
+| Metric | Baseline | Test Run 2 | Improvement |
 |--------|----------|---------|-------------|
 | **CPU Time** | 227.50s | 174.53s | **23.3% faster** |
 | **CUDA Time** | 98.77s | 55.67s | **43.6% faster** |
