@@ -48,7 +48,9 @@ The experiment successfully confirmed the hypothesis:
 | Metric | Original Video | POC Generated Video | Improvement |
 |--------|----------------|-------------------|-------------|
 | **LSE-D Score** | 1.417 | 1.380 | **2.6% better** |
-| **SyncAcc** | 0.0% | 0.0% | No change |
+| **SyncAcc** | 0.0% | 0.0% | No change* |
+
+*Note: SyncAcc uses a threshold of 0.5 for V1.6 from Huggingface. This pipeline uses V1.5, making this metric not relevant in this context.*
 
 **Conclusion**: Lip-sync quality can be quantitatively improved through post-processing video timing corrections, using StableSyncNet as a guide without model retraining.
 
