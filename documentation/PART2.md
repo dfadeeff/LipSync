@@ -4,7 +4,7 @@
 
 This report documents the successful implementation of improvements to the LatentSync model's lip-sync analysis and generation capabilities. The primary objective was to analyze the model's performance, establish a reliable baseline for lip-sync quality, and implement a non-training Proof-of-Concept (POC) that generates measurably improved video synchronization.
 
-**Key Achievement**: Successfully improved lip-sync quality from a baseline LSE-D score of 1.417 to 1.380 through intelligent frame re-timing.
+**Key Achievement**: Successfully improved lip-sync quality from a baseline LSE-D score of ~1.417 to ~1.380 through intelligent frame re-timing.
 
 ## 1. Foundational Fixes: Creating a Reliable Measurement Tool
 
@@ -113,6 +113,7 @@ python scripts/measure_lipsync.py \
 **Results**:
 - Run 1: LSE-D = 1.409, SyncAcc = 0.0%
 - Run 2: LSE-D = 1.417, SyncAcc = 0.0%
+- Run 3: LSE-D = 1.424, SyncAcc = 0.0%
 
 ### POC Video Performance
 ```bash
@@ -129,6 +130,7 @@ python scripts/measure_lipsync.py \
 **Results**:
 - Run 1: LSE-D = 1.390, SyncAcc = 0.0%
 - Run 2: LSE-D = 1.380, SyncAcc = 0.0%
+- Run 3: LSE-D = 1.389, SyncAcc = 0.0%
 
 ## 4. Future Improvement Recommendations
 
