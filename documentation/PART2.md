@@ -134,7 +134,13 @@ python scripts/measure_lipsync.py \
 
 ## 4. Future Improvement Recommendations
 
-### 4.1 Improve Visual Coherence with Temporal Penalty
+### 4.1 Immediate Next Step: Generative Mouth Warping (Non-Training)
+
+**Problem**: The re-timing POC can introduce visual jitter, as the head position of the selected "best" frame may differ from the previous one. It also cannot fix poorly articulated mouth shapes.
+
+**Solution**: Implement a generative compositing pipeline. For each frame `i`, find the best-matching mouth shape from a nearby frame `j`. Then, using pre-trained facial landmark detection, extract, warp, and seamlessly blend the mouth from frame `j` onto the head from frame `i`. This preserves the original head motion's smoothness while transplanting the better-synced mouth, representing a far more advanced non-training POC.
+
+### 4.2 Improve Visual Coherence with Temporal Penalty
 
 **Problem**: Current POC selects best frame for each audio chunk independently, potentially causing visual "jitter" between consecutive frames.
 
@@ -144,7 +150,7 @@ score = distance(audio, video) + λ * distance(video, previous_selected_video)
 ```
 This encourages selection of frames that are both good audio matches and visually smooth.
 
-### 4.2 Generate Facial Landmarks Instead of Re-timing Pixels
+### 4.3 Generate Facial Landmarks Instead of Re-timing Pixels
 
 **Problem**: Re-timing existing frames is limited by original video quality and content.
 
@@ -154,13 +160,13 @@ This encourages selection of frames that are both good audio matches and visuall
 
 This breaks the problem into two simpler, more controllable components.
 
-### 4.3 Condition on Emotional Prosody
+### 4.4 Condition on Emotional Prosody
 
 **Problem**: Model only syncs phonemes (what is said), not prosody (how it's said), missing emotional context.
 
 **Solution**: Augment with lightweight audio encoder trained to extract emotion embeddings from pitch, rhythm, and energy. Feed these embeddings as additional conditions to enable matching facial expressions (smiles for happy speech, furrowed brows for anger).
 
-### 4.4 Implement Dynamic Search Window Size
+### 4.5 Implement Dynamic Search Window Size
 
 **Problem**: Fixed search window size (±3 frames) may be suboptimal for varying speech patterns.
 
