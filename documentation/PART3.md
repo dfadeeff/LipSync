@@ -92,55 +92,124 @@ A robust production system must anticipate and handle failures gracefully:
 
 Continuous monitoring is essential for maintaining service health and performance.
 
-### 5.1 Infrastructure Monitoring
+### 5.1 Infrastructure Monitoring (Node/Pod Level)
 
 **Metrics Tracked:**
 - GPU Utilization (%)
-- GPU Memory Usage (GB)
+- GPU Memory Usage (GB)  
 - CPU Utilization (%)
 - Pod Restart Rate
 
-**Tools:** Prometheus + Kubernetes, AWS CloudWatch Agent
+**Tools:** Prometheus integrated with Kubernetes cluster, AWS CloudWatch Agent
 
-**Critical Alerts:**
-- Sustained GPU utilization below threshold (idle/stuck workers)
-- High pod restart rate (persistent crash loops)
+**Critical Alerts (PagerDuty/Opsgenie):**
+- Sustained GPU utilization below threshold (indicates idle/stuck workers)
+- High rate of pod restarts (indicates persistent crash loop)
 
 ### 5.2 Application Performance Monitoring (APM)
 
 **Metrics Tracked:**
-- End-to-end job processing time
+- End-to-end job processing time (from queue to completion)
 - LSE-D and PSNR/SSIM scores per job
 - Job success/failure rates
 
-**Tools:** Datadog, Splunk, or ELK Stack with custom logging
+**Tools:** Custom logging to centralized services like Datadog, Splunk, or ELK Stack. Log key metrics at each stage of the pipeline (01|init-components, 04|run-pipeline, etc.)
 
 **Critical Alerts:**
-- Average job processing time exceeds 5-minute SLA
-- Job failure rate exceeds 5% over 15-minute window
-- Significant increase in average LSE-D score (model degradation)
+- Alert if average job processing time exceeds 5-minute SLA
+- Alert if job failure rate exceeds defined threshold (e.g., 5% over 15-minute window)
+- Alert on significant increase in average LSE-D score (could indicate "bad" model deployment)
 
 ### 5.3 Queue Monitoring
 
 **Metrics Tracked:**
-- Queue depth (number of pending messages)
+- Number of messages in queue (Queue Depth)
 - Dead-letter queue size
 
 **Tools:** Native AWS SQS CloudWatch metrics
 
 **Auto-Scaling Triggers:**
-- Add workers when queue depth surpasses threshold
-- High-priority alert if DLQ size > 0
+- Trigger auto-scaling event to add more workers when queue depth surpasses threshold
+- Trigger high-priority alert if DLQ size is greater than zero
 
-## 6. Deployment Strategy
+## 6. Security Considerations
 
-### 6.1 Initial Rollout
+### 6.1 Access Control & Authentication
+
+**Identity and Access Management (IAM):**
+- **S3 Bucket Access:** Use IAM roles with least-privilege principles for model storage and output storage access
+- **Service-to-Service Authentication:** Implement service accounts with role-based access control (RBAC) in Kubernetes
+- **API Gateway Security:** Enforce API key authentication, rate limiting, and request signing
+
+**Network Security:**
+- **VPC Isolation:** Deploy all infrastructure within private VPCs with controlled ingress/egress rules
+- **Security Groups:** Configure restrictive security groups allowing only necessary traffic between components
+- **Private Endpoints:** Use VPC endpoints for S3 access to avoid internet routing
+
+### 6.2 Input Validation & Data Protection
+
+**Input Sanitization:**
+- **File Type Validation:** Strict whitelist of allowed video/audio formats and codecs
+- **Content Scanning:** Implement virus scanning and malware detection on uploaded files
+- **Size Limits:** Enforce maximum file size and duration limits to prevent resource exhaustion
+
+**Data Protection:**
+- **Encryption in Transit:** TLS 1.3 for all API communications and internal service communication
+- **Encryption at Rest:** Enable S3 server-side encryption (SSE-S3 or SSE-KMS) for all stored data
+- **Data Retention:** Implement automated cleanup policies for temporary files and user uploads
+
+### 6.3 Container Security
+
+**Image Security:**
+- **Base Image Scanning:** Use minimal, security-hardened base images (e.g., distroless)
+- **Vulnerability Scanning:** Integrate container image scanning in CI/CD pipeline
+- **Runtime Security:** Implement Pod Security Standards and network policies in Kubernetes
+
+## 7. Deployment Strategy
+
+### 7.1 CI/CD Pipeline
+
+**Continuous Integration:**
+```yaml
+# Example GitHub Actions workflow
+name: LatentSync CI/CD
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Docker Image
+        run: docker build -t latentsync:${{ github.sha }} .
+      - name: Security Scan
+        run: docker scan latentsync:${{ github.sha }}
+      - name: Run Tests
+        run: docker run --rm latentsync:${{ github.sha }} pytest
+```
+
+**Continuous Deployment:**
+- **Staging Environment:** Automated deployment to staging cluster for integration testing
+- **Blue-Green Deployment:** Zero-downtime production deployments using blue-green strategy
+- **Rollback Capability:** Automated rollback mechanisms if health checks fail
+- **Infrastructure as Code:** Use Terraform or AWS CDK for reproducible infrastructure provisioning
+
+**Container Registry:**
+- **Private Registry:** Use AWS ECR or Google Container Registry for secure image storage
+- **Image Signing:** Implement container image signing for supply chain security
+- **Multi-Stage Builds:** Optimize container images for production (separate build and runtime stages)
+
+### 7.2 Initial Rollout
 
 1. **Phase 1:** Deploy single-worker proof-of-concept with basic monitoring
 2. **Phase 2:** Implement auto-scaling with 3-5 workers and comprehensive alerting
 3. **Phase 3:** Production rollout with full redundancy and disaster recovery
 
-### 6.2 Scaling Considerations
+### 7.2 Scaling Considerations
 
 **Horizontal Scaling:**
 - Workers scale based on queue depth
@@ -152,7 +221,7 @@ Continuous monitoring is essential for maintaining service health and performanc
 - Implement job priority queues
 - Schedule maintenance during low-traffic periods
 
-## 7. Success Metrics
+## 8. Success Metrics
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
@@ -161,7 +230,7 @@ Continuous monitoring is essential for maintaining service health and performanc
 | **Quality** | LSE-D score consistency ±5% | Per-job quality metrics |
 | **Cost Efficiency** | <$0.50 per generated video | Resource utilization tracking |
 
-## 8. Risk Assessment
+## 9. Risk Assessment
 
 **High Risk:**
 - GPU hardware availability during peak demand
