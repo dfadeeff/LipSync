@@ -55,7 +55,7 @@ The experiment successfully confirmed the hypothesis:
 
 **Conclusion**: Lip-sync quality can be quantitatively improved through post-processing video timing corrections, using StableSyncNet as a guide without model retraining.
 
-#### 2.1.3 What the Improvement Actually Does
+#### 2.1.3 What the Improvement in PoC 1 Actually Does
 
 The POC script creates a new video that is better timed than the original by correcting the small, natural timing errors that occur in any human speech performance.
 
@@ -98,9 +98,6 @@ Distance(A(t), V(t+3)) = 2.2
 - For the new video, it selects the frame from `t-1` to be displayed at time `t`
 - **This process repeats for every single moment in the video**
 
-#### 2.1.4 The Result
-
-The POC creates a new video where each frame is the optimal visual match for its corresponding audio moment, effectively "fixing" the natural timing imperfections that occurred during the original recording.
 
 
 ### 2.2 POC 2: Generative Mouth Warping & Blending
@@ -109,72 +106,50 @@ The POC creates a new video where each frame is the optimal visual match for its
 A visually smoother result can be achieved by compositing the best mouth shape onto a stable head pose.
 
 
-#### 2.2.1 Setup and Implementation
+#### 2.2.1 Implementation (`scripts/create_mouth_warp_poc.py`)
 
 
-###### Install libraries for face landmakers
+**Setup Requirements:**
 ```
+# Install required dependencies
 pip install dlib
-```
 
 ###### Load the model 
-```
+
 # Create a directory for it inside checkpoints if it doesn't exist
 mkdir -p checkpoints/dlib
 
-# Download the model file (approx. 64 MB)
+# Download facial landmark model (64 MB)
 wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 -P checkpoints/dlib/
 bzip2 -d checkpoints/dlib/shape_predictor_68_face_landmarks.dat.bz2
 
-```
 
-###### Create video 
-```
+# Generate improved video using mouth warping
 python scripts/create_mouth_warp_poc.py \
     --video temp/demo1_video_profiled.mp4 \
     --audio temp/audio.wav \
     --output temp/poc_warped_video.mp4
-```
 
-###### Report score using the same measurement tool 
-```
+
+# Measure synchronization quality
+
 python scripts/measure_syncnet_baseline.py \
     --video temp/poc_warped_video.mp4 \
     --audio temp/audio.wav
 ```
 
-This more advanced POC tests the hypothesis that visual smoothness can be preserved while still achieving sync improvements.
-Methodology: This script acts as a generative compositor:
+The algorithm works as follows:
 
-Search Phase: Uses the same StableSyncNet search logic to determine that for audio moment i, the best mouth shape exists in frame j
-Landmark Detection: Uses dlib landmark detector to find precise coordinates of the mouth in both the target frame i (for head pose) and the source frame j (for mouth shape)
-Warping & Blending: Extracts, warps, and blends the mouth from frame j onto the face in frame i using a feathered mask and Poisson blending (cv2.seamlessClone) for natural-looking composites
+**Data Ingestion Phase:** 
+Load video frames, detect faces, extract 68-point landmarks using dlib, and crop face regions for each frame
 
-Analysis: This method is truly generative as it creates new pixel data. Its primary strength is that it preserves the smooth head motion of the original video, eliminating the jitter problem of POC 1. Its weakness is that the compositing process (warping and blending) introduces subtle visual artifacts, which the highly-sensitive StableSyncNet visual encoder penalizes, resulting in a slightly higher LSE-D score.
+**Audio-Visual Embedding Phase:** 
+Calculate StableSyncNet embeddings for audio chunks and video chunks, same as POC 1
 
+**Best-Match Mapping Phase:** For each audio chunk i, search temporal window (from i-3 to i+3) to find video frame j with optimal mouth shape
 
-**Step 1: Setup & Data Ingestion**
-* The script requires the dlib library and its pre-trained facial landmark model (shape_predictor_68_face_landmarks.dat).
-* It processes the entire video, and for each frame, it stores a data package containing:
-  1. The original full-resolution frame.
-  2. A cropped image of the detected face.
-  3. The precise 68 (x, y) coordinates of the facial landmarks detected by dlib.
-
-**Step 2: Best-Match Search**
-* This step uses the same StableSyncNet search logic as POC 1. It creates a "map" that determines, for each audio chunk i, which video frame j contains the best-synced mouth shape.
-
-**Step 3: Generative Compositing**
-* For each frame i in the output video, the script performs a complex generative operation:
-  * **Target:** The original frame i provides the stable head pose, background, and lighting.
-  * **Source:** The original frame j (from the map) provides the optimal mouth shape.
-  * **Extract:** It uses the dlib landmarks to isolate the mouth region from the source frame j.
-  * **Warp:** It calculates a perspective transformation to stretch and rotate the source mouth so it fits perfectly onto the mouth region of the target frame i.
-  * **Blend:** It uses a **feathered mask** and **Poisson Blending** (cv2.seamlessClone) to seamlessly merge the warped mouth onto the target face, smoothing edges and matching skin tones to minimize visual artifacts.
-
-**Step 4: Final Video Generation**
-* The script saves each new, composited frame as a PNG image and then uses ffmpeg to stitch them into a final video with the original audio track.
-
-
+**Generative Compositing Phase:** For each target frame i, warp and blend the mouth from source frame j using perspective transformation and Poisson blending
+Video Assembly Phase: Save composited frames as PNG images and stitch into final video with original audio using ffmpeg
 
 
 #### 2.2.2 Results
@@ -184,6 +159,60 @@ The experiment successfully confirmed the hypothesis:
 |--------|----------------|-------------------|-------------|
 | **LSE-D Score** | 1.417 | 1.402 | **1.1% better** |
 | **SyncAcc** | 0.0% | 0.0% | No change* |
+
+
+#### 2.2.3 What the Improvement in PoC 2 Actually Does
+#### 2.2.3 What the Improvement in PoC 2 Actually Does
+
+The POC 2 script creates a new video with better lip-sync by preserving the natural head motion while transplanting optimally-synced mouth shapes from other frames, solving the visual jitter problem of POC 1.
+
+##### The Problem: Head Motion vs. Sync Quality Trade-off
+
+Consider the same moment in the video:
+- **The speaker makes an "oooo" sound**
+- **The speaker's lips form an "O" shape**
+- **But the perfect "O" shape occurs when the head is tilted differently**
+
+While POC 1 would simply use the frame with the perfect "O" shape (causing a head position jump), POC 2 preserves the smooth head motion while transplanting just the mouth region.
+
+##### The Solution: Generative Mouth Transplantation
+
+Here's what POC 2 does for that single moment:
+
+**Step 1: Dual Frame Analysis**
+- The script identifies the **target frame `i`** (current timeline position with stable head pose)
+- Uses StableSyncNet to find the **source frame `j`** (contains the best mouth shape for this audio moment)
+- Extracts 68 facial landmarks from both frames using dlib's predictor
+
+**Step 2: Mouth Region Isolation**
+- Focuses on landmarks 48-67 (mouth region) from both frames
+- Creates a **feathered mask** with two zones:
+ - Inner hull: Tight mouth boundary (255 intensity)
+ - Outer hull: Blend region scaled 15% larger (128 intensity)
+ - Applies Gaussian blur for smooth gradient transitions
+
+**Step 3: Geometric Transformation**
+- Calculates homography transformation between source and target mouth landmarks:
+
+Source mouth points → Target mouth points
+Frame j mouth shape → Frame i mouth position
+Homography matrix H transforms coordinates
+
+**Step 4: Generative Compositing**
+- **Warp**: Applies perspective transformation to align source mouth with target geometry
+- **Blend**: Uses `cv2.seamlessClone` with `NORMAL_CLONE` for photorealistic integration
+- **Color Match**: Automatically adjusts lighting and skin tone consistency
+
+##### The Result
+
+POC 2 creates a new video where:
+- **Head motion remains perfectly smooth** (from original timeline)
+- **Mouth shapes are optimally synced** (from best-matching frames)
+- **Visual artifacts are minimized** through advanced blending techniques
+- **Each frame is truly generated** through sophisticated image composition
+
+This approach eliminates the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
+
 
 
 
@@ -196,9 +225,10 @@ The experiment successfully confirmed the hypothesis:
 | **POC 2 (Mouth Warping)** | 1.402 | **-1.1%** | **Best visual smoothness**; prioritizes visual coherence |
 
 
-**Conclusion**: The results demonstrate a some trade-off:
+**Conclusion**: The results demonstrate some trade-off:
 - **POC 1** is the superior method if the singular goal is to achieve the best possible score on the LSE-D metric
 - **POC 2**, while scoring slightly worse due to synthetic artifacts, produces a visually smoother video and represents a more technically advanced generative approach, laying the groundwork for more sophisticated models
+
 
 
 
