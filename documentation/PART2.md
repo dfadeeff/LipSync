@@ -200,6 +200,8 @@ The experiment successfully confirmed the hypothesis:
 - **POC 1** is the superior method if the singular goal is to achieve the best possible score on the LSE-D metric
 - **POC 2**, while scoring slightly worse due to synthetic artifacts, produces a visually smoother video and represents a more technically advanced generative approach, laying the groundwork for more sophisticated models
 
+
+
 ## 3. Baseline Measurement Results
 
 ### Original Video Performance
