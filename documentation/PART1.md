@@ -160,9 +160,6 @@ from gradio_app_opt import CONFIG_PATH, create_args, clear_gpu_memory
 ### 4.1 Optimization Progression
 
 #### **Baseline test runs**
-```bash
-python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
-```
 
 | Metric | Baseline Test 1 | Baseline Test 2 | Improvement |
 |--------|----------|--------|-------------|
