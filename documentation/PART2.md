@@ -213,6 +213,8 @@ POC 2 creates a new video where:
 This approach is expected to eliminate the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
 
 
+
+
 ### 2.3 Overall Results
 
 | Experiment | Avg. LSE-D Score (Lower is Better) | Improvement vs. Baseline | Key Feature |
