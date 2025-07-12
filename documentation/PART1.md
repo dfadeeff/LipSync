@@ -198,6 +198,134 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | **GEMM Operations** | 41.34s | ~20s | **~50% faster** |
 | **Attention Mechanisms** | 9.07s | 5.36s | **40.9% faster** |
 
+### 4.3 Test Result details
+
+#### **Test 1: Baseline Performance**
+```bash
+python tools/profile_inference_baseline.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
+```
+
+| Metric | Baseline Performance |
+|--------|---------------------|
+| **CPU Time** | 227.50s |
+| **CUDA Time** | 98.77s |
+| **Peak Memory (Allocated/Reserved)** | 11.24GB / 11.50GB |
+| **Quality (PSNR)** | 36.71 dB |
+| **Quality (SSIM)** | 0.9801 |
+
+**Top 10 Operations - Baseline:**
+| Operation | Self CUDA Time | % of Total | Avg Time | Component |
+|-----------|----------------|------------|----------|-----------|
+| 04\|run-pipeline | 117.32s | 118.78%* | 19.553s | Main Pipeline |
+| 04\|unet-denoise-loop | 82.90s | 83.93% | 5.182s | UNet Diffusion |
+| 02\|align-faces | 34.99s | 35.42% | 5.831s | Face Alignment |
+| aten::addmm | 31.25s | 31.64% | 1.216ms | Linear Layers |
+| aten::cudnn_convolution | 25.56s | 25.87% | 1.776ms | Convolutions |
+| volta_sgemm_128x64_tn | 24.82s | 25.13% | 1.212ms | GEMM Kernel |
+| volta_sgemm_32x128_tn | 16.52s | 16.72% | 0.634ms | GEMM Kernel |
+| aten::mm | 13.02s | 13.18% | 0.395ms | Matrix Multiply |
+| aten::_efficient_attention_forward | 9.07s | 9.18% | 0.928ms | Attention Mechanism |
+| 05\|restore-faces | 8.56s | 8.66% | 8.557s | Face Restoration |
+
+#### **Test 2: Initial Optimizations**
+```bash
+python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
+```
+
+**Model Optimizations Implemented:**
+- TF32 GEMM
+- xFormers attention
+- FP16 precision (autocast) with fallback to FP32
+- UNet movement to GPU
+
+| Metric | Baseline | Test 2 | Improvement |
+|--------|----------|--------|-------------|
+| **CPU Time** | 227.50s | 219.50s | 3.5% faster |
+| **CUDA Time** | 98.77s | 99.11s | ~No change |
+| **Peak Memory** | 11.24GB | 11.24GB | No change |
+
+**Top 10 Operations - Test 2:**
+| Operation | Self CUDA Time | % of Total | Avg Time | Component |
+|-----------|----------------|------------|----------|-----------|
+| 04\|run-pipeline | 116.18s | 117.22%* | 19.34s | Main Pipeline |
+| 01\|init-components | 87.11s | 87.89% | 87.105s | Initialization |
+| 04\|unet-denoise-loop | 82.74s | 83.48% | 5.171s | UNet Diffusion |
+| 02\|align-faces | 33.44s | 33.74% | 5.573s | Face Alignment |
+| aten::addmm | 31.24s | 31.52% | 1.215ms | Linear Layers |
+| aten::cudnn_convolution | 25.67s | 25.90% | 1.784ms | Convolutions |
+| volta_sgemm_128x64_tn | 24.81s | 25.03% | 1.212ms | GEMM Kernel |
+| volta_sgemm_32x128_tn | 16.51s | 16.65% | 0.634ms | GEMM Kernel |
+| aten::mm | 13.01s | 13.13% | 0.395ms | Matrix Multiply |
+| aten::_efficient_attention_forward | 9.08s | 9.16% | 0.928ms | Attention Mechanism |
+
+#### **Test 3A: Advanced Optimizations**
+
+**Additional Model/Memory Optimizations:**
+- Cache interval changed from 3 to 2
+- VAE tiling and slicing
+
+| Metric | Baseline | Test 3A | Improvement |
+|--------|----------|---------|-------------|
+| **CPU Time** | 227.50s | 186.21s | **18.2% faster** |
+| **CUDA Time** | 98.77s | 55.56s | **43.7% faster** |
+| **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
+
+**Top 10 Operations - Test 3A:**
+| Operation | Self CUDA Time | % of Total | Avg Time | Component |
+|-----------|----------------|------------|----------|-----------|
+| 01\|init-components | 85.55s | 153.99%* | 85.55s | Initialization |
+| 04\|run-pipeline | 82.61s | 148.69% | 13.768s | Main Pipeline |
+| 04\|unet-denoise-loop | 49.54s | 89.17% | 3.096s | UNet Diffusion |
+| 02\|align-faces | 34.45s | 62.00% | 5.741s | Face Alignment |
+| aten::cudnn_convolution | 14.64s | 26.34% | 0.370ms | Convolutions |
+| aten::copy_ | 10.25s | 18.45% | 0.035ms | Memory Copy |
+| 05\|restore-faces | 8.69s | 15.64% | 8.691s | Face Restoration |
+| aten::addmm | 7.27s | 13.09% | 0.212ms | Linear Layers |
+| aten::_efficient_attention_forward | 5.36s | 9.65% | 0.396ms | Attention Mechanism |
+| aten::native_group_norm | 4.11s | 7.40% | 0.128ms | Group Norm |
+
+#### **Test 3B: Final Optimized Pipeline**
+
+**Additional Optimizations:**
+- DeepCache optimization
+
+| Metric | Baseline | Test 3B | Improvement |
+|--------|----------|---------|-------------|
+| **CPU Time** | 227.50s | 174.53s | **23.3% faster** |
+| **CUDA Time** | 98.77s | 55.67s | **43.6% faster** |
+| **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
+| **Quality (PSNR)** | 36.71 dB | 36.68 dB | **Maintained** |
+| **Quality (SSIM)** | 0.9801 | 0.9801 | **Identical** |
+
+**Top 10 Operations - Test 3B:**
+| Operation | Self CUDA Time | % of Total | Avg Time | Component |
+|-----------|----------------|------------|----------|-----------|
+| 04\|run-pipeline | 83.144s | 149.34%* | 13.857s | Main Pipeline |
+| 01\|init-components | 73.609s | 132.22%* | 73.609s | Initialization |
+| 04\|unet-denoise-loop | 49.238s | 88.44% | 3.077s | UNet Diffusion |
+| 02\|align-faces | 34.640s | 62.22% | 5.773s | Face Alignment |
+| aten::cudnn_convolution | 14.643s | 26.30% | 0.370s | Convolutions |
+| aten::copy_ | 10.326s | 18.55% | 0.035s | Memory Copy |
+| 05\|restore-faces | 8.654s | 15.54% | 8.654s | Face Restoration |
+| aten::addmm | 7.273s | 13.06% | 0.211s | Linear Layers |
+| aten::_efficient_attention_forward | 5.362s | 9.63% | 0.396s | Attention Mechanism |
+| aten::native_group_norm | 4.109s | 7.38% | 0.128s | Group Norm |
+
+*Note: Percentages >100% due to inclusive/exclusive counter overlap.
+
+### 4.2 Component-Level Performance Analysis
+
+**Most Impacted Operations** (Test 3B vs Baseline):
+
+| Operation | Baseline Time | Optimized Time | Improvement |
+|-----------|---------------|----------------|-------------|
+| **UNet Diffusion** | 82.90s | 49.24s | **40.6% faster** |
+| **Face Alignment** | 34.99s | 34.64s | **1.0% faster** |
+| **GEMM Operations** | 41.34s | ~20s | **~50% faster** |
+| **Attention Mechanisms** | 9.07s | 5.36s | **40.9% faster** |
+
+
+
 ## 5. Quality Assurance
 
 ### 5.1 Output Quality Verification
@@ -345,3 +473,7 @@ The optimization effort successfully achieved significant performance improvemen
 4. **Iterative approach** with continuous measurement and validation
 
 The optimized pipeline provides substantial practical benefits for production deployment while maintaining the high-quality output expected from the LatentSync model.
+
+
+
+
