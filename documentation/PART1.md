@@ -159,7 +159,7 @@ from gradio_app_opt import CONFIG_PATH, create_args, clear_gpu_memory
 
 ### 4.1 Optimization Progression
 
-#### **Test 2: Initial Optimizations**
+#### **Baseline test runs**
 ```bash
 python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
 ```
@@ -170,7 +170,7 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | **CUDA Time** | 98.77s | 99.11s | ~No change |
 | **Peak Memory** | 11.24GB | 11.24GB | No change |
 
-#### **Test Run 1: Advanced Optimizations**
+#### **Improvement: Test Run 1 (3A), Advanced Optimizations**
 
 | Metric | Baseline | Test Run 1 | Improvement |
 |--------|----------|---------|-------------|
@@ -178,7 +178,7 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | **CUDA Time** | 98.77s | 55.56s | **43.7% faster** |
 | **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
 
-#### **Test Run 2: Advanced Optimizations**
+#### **Improvement: Test Run 2 (3B), Advanced Optimizations**
 
 | Metric | Baseline | Test Run 2 | Improvement |
 |--------|----------|---------|-------------|
