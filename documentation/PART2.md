@@ -162,7 +162,6 @@ The experiment successfully confirmed the hypothesis:
 
 
 #### 2.2.3 What the Improvement in PoC 2 Actually Does
-#### 2.2.3 What the Improvement in PoC 2 Actually Does
 
 The POC 2 script creates a new video with better lip-sync by preserving the natural head motion while transplanting optimally-synced mouth shapes from other frames, solving the visual jitter problem of POC 1.
 
