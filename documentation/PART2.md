@@ -186,31 +186,29 @@ Here's what POC 2 does for that single moment:
 **Step 2: Mouth Region Isolation**
 - Focuses on landmarks 48-67 (mouth region) from both frames
 - Creates a **feathered mask** with two zones:
- - Inner hull: Tight mouth boundary (255 intensity)
- - Outer hull: Blend region scaled 15% larger (128 intensity)
- - Applies Gaussian blur for smooth gradient transitions
+  - **Outer hull**: Blend region scaled 15% larger from mouth center (128 intensity)
+  - **Inner hull**: Tight mouth boundary using `cv2.convexHull` (255 intensity)
+  - Applies `cv2.GaussianBlur` with (15,15) kernel for smooth gradient transitions
 
 **Step 3: Geometric Transformation**
-- Calculates homography transformation between source and target mouth landmarks:
-
-Source mouth points → Target mouth points
-Frame j mouth shape → Frame i mouth position
-Homography matrix H transforms coordinates
+- Calculates **homography matrix** using `cv2.findHomography` with RANSAC between source and target mouth landmarks:
+cv2.findHomography(source_mouth_points, target_mouth_points, cv2.RANSAC)
+Source landmarks (frame j) → Target landmarks (frame i)
 
 **Step 4: Generative Compositing**
-- **Warp**: Applies perspective transformation to align source mouth with target geometry
-- **Blend**: Uses `cv2.seamlessClone` with `NORMAL_CLONE` for photorealistic integration
-- **Color Match**: Automatically adjusts lighting and skin tone consistency
+- **Warp**: Applies `cv2.warpPerspective` to transform both source frame and feathered mask using homography matrix
+- **Blend**: Uses `cv2.seamlessClone` with `cv2.NORMAL_CLONE` flag for photorealistic integration
+- **Center Point**: Uses bounding rectangle center of target mouth for seamless cloning
 
 ##### The Result
 
 POC 2 creates a new video where:
-- **Head motion remains smooth** (from original timeline)
-- **Mouth shapes are synced** (from best-matching frames)
-- **Visual artifacts are expected to be minimized** through advanced blending techniques
-- **Each frame is truly generated** through sophisticated image composition
+- **Head motion remains perfectly smooth** (from original timeline sequence)
+- **Mouth shapes are optimally synced** (warped from best-matching frames)
+- **Visual artifacts are minimized** through feathered masking and Poisson blending
+- **Each frame is truly generated** through perspective transformation and seamless compositing
 
-This approach is expected to eliminate the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
+This approach eliminates the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
 
 
 
