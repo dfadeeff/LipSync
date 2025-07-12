@@ -205,14 +205,12 @@ Homography matrix H transforms coordinates
 ##### The Result
 
 POC 2 creates a new video where:
-- **Head motion remains perfectly smooth** (from original timeline)
-- **Mouth shapes are optimally synced** (from best-matching frames)
-- **Visual artifacts are minimized** through advanced blending techniques
+- **Head motion remains smooth** (from original timeline)
+- **Mouth shapes are synced** (from best-matching frames)
+- **Visual artifacts are expected to be minimized** through advanced blending techniques
 - **Each frame is truly generated** through sophisticated image composition
 
-This approach eliminates the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
-
-
+This approach is expected to eliminate the temporal jitter of frame re-timing while achieving meaningful sync improvements through generative pixel creation.
 
 
 ### 2.3 Overall Results
