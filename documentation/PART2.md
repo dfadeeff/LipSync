@@ -153,6 +153,29 @@ Warping & Blending: Extracts, warps, and blends the mouth from frame j onto the 
 Analysis: This method is truly generative as it creates new pixel data. Its primary strength is that it preserves the smooth head motion of the original video, eliminating the jitter problem of POC 1. Its weakness is that the compositing process (warping and blending) introduces subtle visual artifacts, which the highly-sensitive StableSyncNet visual encoder penalizes, resulting in a slightly higher LSE-D score.
 
 
+##### Step 1: Setup & Data Ingestion
+- **The script requires the dlib library and its pre-trained facial landmark model (shape_predictor_68_face_landmarks.dat).**
+- **It processes the entire video, and for each frame, it stores a data package containing:**
+- **The original full-resolution frame.**
+- **A cropped image of the detected face.**
+- **The precise 68 (x, y) coordinates of the facial landmarks detected by dlib.**
+
+
+##### Step 2: Best-Match Search
+This step uses the same StableSyncNet search logic as POC 1. It creates a "map" that determines, for each audio chunk i, which video frame j contains the best-synced mouth shape.
+
+
+##### Step 3: Generative Compositing
+For each frame i in the output video, the script performs a complex generative operation:
+-**Target: The original frame i provides the stable head pose, background, and lighting.**
+-**Source: The original frame j (from the map) provides the optimal mouth shape.**
+Extract: It uses the dlib landmarks to isolate the mouth region from the source frame j.
+Warp: It calculates a perspective transformation to stretch and rotate the source mouth so it fits perfectly onto the mouth region of the target frame i.
+Blend: It uses a feathered mask and Poisson Blending (cv2.seamlessClone) to seamlessly merge the warped mouth onto the target face, smoothing edges and matching skin tones to minimize visual artifacts.
+
+
+
+
 #### 2.2.2 Results
 The experiment successfully confirmed the hypothesis:
 
