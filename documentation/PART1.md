@@ -4,7 +4,7 @@
 
 This report documents the systematic optimization of the LatentSync inference pipeline, achieving significant performance improvements while maintaining output quality. Through careful profiling and targeted optimizations, we reduced CUDA inference time from **98.77s to 55.67s** (a **43.6% improvement**) and decreased memory usage from **11.24GB to 4.02GB** (a **64.2% reduction**).
 
-**Key Achievement**: Successfully optimized the inference pipeline achieving 1.77x speedup with identical output quality (PSNR: 36.71 dB, SSIM: 0.9801).
+**Key Achievement**: Successfully optimized the inference pipeline achieving 1.77x speedup with no perceptible loss in visual quality (PSNR: 36.71 dB → 36.68 dB, SSIM: maintained at 0.9801).
 
 ## 1. Baseline Profiling
 
@@ -16,7 +16,7 @@ python tools/profile_inference_baseline.py assets/demo1_video.mp4 assets/demo1_a
 
 ## 2. Performance Analysis and Bottleneck Identification
 
-### 2.1 Baseline Performance (Test 1)
+### 2.1 Baseline Performance 
 
 | Metric | Baseline Performance |
 |--------|---------------------|
@@ -68,23 +68,23 @@ After analyzing the provided code, here are the **exact differences** between ba
 
 **1. Hardware Acceleration Enablement**
 ```python
-# Line 21-22: Enable TF32 for better GEMM performance
+# Enable TF32 for better GEMM performance
 import torch
 torch.backends.cuda.matmul.allow_tf32 = True
 ```
 
 **2. Environment Configuration**
 ```python
-# Line 29: Disable tokenizer parallelism to prevent conflicts
+# Disable tokenizer parallelism to prevent conflicts
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 ```
 
 **3. Mixed Precision Setup**
 ```python
-# Line 28: Import autocast for mixed precision
+# Import autocast for mixed precision
 from torch.amp import autocast
 
-# Lines 38-40: Force FP16 precision instead of capability checking
+# Force FP16 precision instead of capability checking
 # Baseline: Dynamic FP16 detection
 # is_fp16_supported = torch.cuda.is_available() and torch.cuda.get_device_capability()[0] > 7
 # dtype = torch.float16 if is_fp16_supported else torch.float32
@@ -95,7 +95,7 @@ dtype = torch.float16
 
 **4. VAE Memory Optimizations**
 ```python
-# Lines 65-66: Enable VAE memory efficiency
+# Enable VAE memory efficiency
 vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse", torch_dtype=dtype)
 vae.enable_tiling()    # NEW: Reduces memory for large images
 vae.enable_slicing()   # NEW: Process in smaller chunks
@@ -103,7 +103,7 @@ vae.enable_slicing()   # NEW: Process in smaller chunks
 
 **5. UNet GPU Optimization**
 ```python
-# Lines 75-79: Improved UNet setup
+# Improved UNet setup
 # Baseline: unet = unet.to(dtype=dtype)
 # Optimized: 
 unet = unet.to(device="cuda", dtype=dtype)  # Direct GPU placement
@@ -112,7 +112,7 @@ unet.set_use_memory_efficient_attention_xformers(True)  # NEW: xFormers attentio
 
 **6. DeepCache Tuning**
 ```python
-# Line 92: Optimized cache interval
+# Optimized cache interval
 # Baseline: helper.set_params(cache_interval=3, cache_branch_id=0)
 # Optimized: 
 helper.set_params(cache_interval=2, cache_branch_id=0)  # More aggressive caching
@@ -120,7 +120,7 @@ helper.set_params(cache_interval=2, cache_branch_id=0)  # More aggressive cachin
 
 **7. Mixed Precision Inference**
 ```python
-# Lines 103-104: Autocast wrapper for inference
+# Autocast wrapper for inference
 # Baseline: with rf("04|run-pipeline"):
 # Optimized:
 with rf("04|run-pipeline"), autocast(device_type="cuda", dtype=dtype):
@@ -161,21 +161,21 @@ from gradio_app_opt import CONFIG_PATH, create_args, clear_gpu_memory
 
 #### **Baseline test runs**
 
-| Metric | Baseline Test 1 | Baseline Test 2 | Improvement |
-|--------|----------|--------|-------------|
-| **CPU Time** | 227.50s | 219.50s | 3.5% faster (negligible) |
-| **CUDA Time** | 98.77s | 99.11s | ~No change |
-| **Peak Memory** | 11.24GB | 11.24GB | No change |
+| Metric | Baseline Test | 
+|--------|----------|
+| **CPU Time** | 227.50s  | 
+| **CUDA Time** | 98.77s  | 
+| **Peak Memory** | 11.24GB | 
 
-#### **Improvement: Test Run 1 (3A), Advanced Optimizations**
+#### **Improvement: Test Run 1 (2A), Advanced Optimizations**
 
 | Metric | Baseline | Test Run 1 | Improvement |
 |--------|----------|---------|-------------|
 | **CPU Time** | 227.50s | 186.21s | **18.2% faster** |
-| **CUDA Time** | 98.77s | 55.56s | **43.7% faster** |
+| **CUDA Time** | 98.77s | 55.72s | **43.6% faster** |
 | **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
 
-#### **Improvement: Test Run 2 (3B), Advanced Optimizations**
+#### **Improvement: Test Run 2 (2B), Advanced Optimizations**
 
 | Metric | Baseline | Test Run 2 | Improvement |
 |--------|----------|---------|-------------|
@@ -224,50 +224,25 @@ python tools/profile_inference_baseline.py assets/demo1_video.mp4 assets/demo1_a
 | aten::_efficient_attention_forward | 9.07s | 9.18% | 0.928ms | Attention Mechanism |
 | 05\|restore-faces | 8.56s | 8.66% | 8.557s | Face Restoration |
 
-#### **Test 2: Initial Optimizations**
-```bash
-python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.wav --steps 20 --scale 1.5
-```
 
-**Model Optimizations Implemented:**
+
+#### **Test 2A: Advanced Optimizations**
+
+**Memory Optimizations:**
+- Cache interval changed from 3 to 2
+- VAE tiling and slicing
 - TF32 GEMM
 - xFormers attention
 - FP16 precision (autocast) with fallback to FP32
 - UNet movement to GPU
 
-| Metric | Baseline | Test 2 | Improvement |
-|--------|----------|--------|-------------|
-| **CPU Time** | 227.50s | 219.50s | 3.5% faster |
-| **CUDA Time** | 98.77s | 99.11s | ~No change |
-| **Peak Memory** | 11.24GB | 11.24GB | No change |
-
-**Top 10 Operations - Test 2:**
-| Operation | Self CUDA Time | % of Total | Avg Time | Component |
-|-----------|----------------|------------|----------|-----------|
-| 04\|run-pipeline | 116.18s | 117.22%* | 19.34s | Main Pipeline |
-| 01\|init-components | 87.11s | 87.89% | 87.105s | Initialization |
-| 04\|unet-denoise-loop | 82.74s | 83.48% | 5.171s | UNet Diffusion |
-| 02\|align-faces | 33.44s | 33.74% | 5.573s | Face Alignment |
-| aten::addmm | 31.24s | 31.52% | 1.215ms | Linear Layers |
-| aten::cudnn_convolution | 25.67s | 25.90% | 1.784ms | Convolutions |
-| volta_sgemm_128x64_tn | 24.81s | 25.03% | 1.212ms | GEMM Kernel |
-| volta_sgemm_32x128_tn | 16.51s | 16.65% | 0.634ms | GEMM Kernel |
-| aten::mm | 13.01s | 13.13% | 0.395ms | Matrix Multiply |
-| aten::_efficient_attention_forward | 9.08s | 9.16% | 0.928ms | Attention Mechanism |
-
-#### **Test 3A: Advanced Optimizations**
-
-**Additional Model/Memory Optimizations:**
-- Cache interval changed from 3 to 2
-- VAE tiling and slicing
-
-| Metric | Baseline | Test 3A | Improvement |
+| Metric | Baseline | Test 2A | Improvement |
 |--------|----------|---------|-------------|
 | **CPU Time** | 227.50s | 186.21s | **18.2% faster** |
-| **CUDA Time** | 98.77s | 55.56s | **43.7% faster** |
+| **CUDA Time** | 98.77s | 55.72s | **43.6% faster** |
 | **Peak Memory** | 11.24GB | 4.02GB | **64.2% reduction** |
 
-**Top 10 Operations - Test 3A:**
+**Top 10 Operations - Test 2A:**
 | Operation | Self CUDA Time | % of Total | Avg Time | Component |
 |-----------|----------------|------------|----------|-----------|
 | 01\|init-components | 85.55s | 153.99%* | 85.55s | Initialization |
@@ -281,12 +256,12 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | aten::_efficient_attention_forward | 5.36s | 9.65% | 0.396ms | Attention Mechanism |
 | aten::native_group_norm | 4.11s | 7.40% | 0.128ms | Group Norm |
 
-#### **Test 3B: Final Optimized Pipeline**
+#### **Test 2B: Final Optimized Pipeline**
 
 **Additional Optimizations:**
 - DeepCache optimization
 
-| Metric | Baseline | Test 3B | Improvement |
+| Metric | Baseline | Test 2B | Improvement |
 |--------|----------|---------|-------------|
 | **CPU Time** | 227.50s | 174.53s | **23.3% faster** |
 | **CUDA Time** | 98.77s | 55.67s | **43.6% faster** |
@@ -294,7 +269,7 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 | **Quality (PSNR)** | 36.71 dB | 36.68 dB | **Maintained** |
 | **Quality (SSIM)** | 0.9801 | 0.9801 | **Identical** |
 
-**Top 10 Operations - Test 3B:**
+**Top 10 Operations - Test 2B:**
 | Operation | Self CUDA Time | % of Total | Avg Time | Component |
 |-----------|----------------|------------|----------|-----------|
 | 04\|run-pipeline | 83.144s | 149.34%* | 13.857s | Main Pipeline |
@@ -312,7 +287,7 @@ python tools/profile_inference_opt.py assets/demo1_video.mp4 assets/demo1_audio.
 
 ### 4.2 Component-Level Performance Analysis
 
-**Most Impacted Operations** (Test 3B vs Baseline):
+**Most Impacted Operations** (Test 2B vs Baseline):
 
 | Operation | Baseline Time | Optimized Time | Improvement |
 |-----------|---------------|----------------|-------------|
@@ -335,10 +310,7 @@ The optimization maintains identical visual quality:
 
 ### 5.2 Numerical Stability
 
-All optimizations preserve numerical stability through:
-- Careful mixed precision implementation
-- Fallback to FP32 when necessary
-- Gradient scaling for training stability (future consideration)
+The use of torch.float16 precision throughout the pipeline introduces minor numerical deviations compared to the FP32 baseline, as evidenced by the negligible 0.03 dB change in PSNR. These deviations do not result in any perceptible visual artifacts or stability issues during inference.
 
 ## 6. Future Optimization Opportunities
 
