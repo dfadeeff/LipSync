@@ -1,8 +1,8 @@
-# Lip-Sync Analysis and Generation: Implementation Report
+# Lip-Sync Analysis: Implementation Report of non-training techniques
 
 ## Executive Summary
 
-This report documents the successful implementation of improvements to the LatentSync model's lip-sync analysis and generation capabilities. The primary objective was to analyze the model's performance, establish a reliable baseline for lip-sync quality, and implement a non-training Proof-of-Concept (POC) that generates measurably improved video synchronization.
+This report documents the successful implementation of post processing techniques to boost lip sync accuracy. The primary objective was to analyze the model's performance, establish a reliable baseline for lip-sync quality, and implement a non-training Proof-of-Concept (POC) that generates measurably improved video synchronization.
 
 **Key Achievement**: Successfully improved lip-sync quality from a baseline LSE-D score of ~1.417 to ~1.380 through intelligent frame re-timing.
 
@@ -16,7 +16,7 @@ Before implementing improvements, critical fixes were required to make the provi
 
 **Solution**: Added missing architectural components:
 - `AdaptiveAvgPool2d` layer to the `DownEncoder2D` class for standardizing spatial dimensions of feature maps
-- `nn.Linear` projection heads (`audio_proj` and `visual_proj`) to the main `StableSyncNet` class for mapping audio and visual embeddings to a common 1024-dimensional space
+- `nn.Linear` projection heads (`audio_proj` and `visual_proj`) to the main `StableSyncNet` class for mapping audio and visual embeddings, chose 1024 to load it properly and avoid mismatch issues and reduce compute for PoC
 
 ### 1.2 Update to `scripts/load_syncnet.py`
 
@@ -303,4 +303,3 @@ This breaks the problem into two simpler, more controllable components.
 - **LSE-D**: Lower scores indicate better lip-sync quality
 - **SyncAcc**: Higher percentages indicate better synchronization accuracy
 - **Search Window**: Current implementation uses ±3 frames for temporal search
-- **Architecture**: StableSyncNet with 2048-dimensional embedding space for audio-visual comparison

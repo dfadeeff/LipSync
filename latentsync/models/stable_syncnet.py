@@ -52,7 +52,7 @@ class StableSyncNet(nn.Module):
         audio_out_dim = config["audio_encoder"]["block_out_channels"][-1]
         visual_out_dim = config["visual_encoder"]["block_out_channels"][-1]
         
-        # This dimension is a common choice and matches what's expected from the checkpoint.
+        # This dimension matches what's expected from the checkpoint
         # The layer names 'audio_proj' and 'visual_proj' are what the loader will look for.
         common_embed_dim = 1024
 
