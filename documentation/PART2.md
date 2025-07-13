@@ -262,8 +262,6 @@ python scripts/measure_lipsync.py \
 
 ## 4. Future Improvement Recommendations
 
-
-
 ### 4.1 Improve Visual Coherence with Temporal Penalty
 
 **Problem**: Current POC selects best frame for each audio chunk independently, potentially causing visual "jitter" between consecutive frames.
