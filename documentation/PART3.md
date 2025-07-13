@@ -1,14 +1,14 @@
 # LatentSync: Production Deployment Plan
 
 **Document Version:** 1.0  
-**Date:** July 13, 2025  
+**Date:** July 14, 2025  
 
 
 ## 1. Executive Summary
 
 This document outlines the technical strategy for deploying the LatentSync video generation pipeline into a scalable, reliable, and cost-effective production environment. The plan addresses critical considerations including infrastructure design, performance optimization, hardware requirements, fault tolerance, and monitoring.
 
-The core objective is to transition the system from research and development to a robust service capable of handling significant concurrent video generation requests while maintaining predictable performance and quality. Based on our performance profiling, the optimized pipeline (Test 3B) serves as the foundation for this deployment, achieving **~1.8x speedup** and **64% memory reduction** compared to the baseline.
+The core objective is to transition the system from research and development to a robust service capable of handling significant concurrent video generation requests while maintaining predictable performance and quality. Based on our performance profiling, the optimized pipeline (Test 2B) serves as the foundation for this deployment, achieving **~1.8x speedup** and **64% memory reduction** compared to the baseline.
 
 ## 2. System Architecture & Infrastructure
 
@@ -21,21 +21,34 @@ The production system will be architected as a decoupled, asynchronous service t
 | **API Gateway** | Public-facing entry point handling authentication, request validation, and rate limiting | AWS API Gateway / Google Cloud Endpoints |
 | **Request Queue** | Message queue to decouple API from processing workers, smoothing traffic spikes and enabling retries | AWS SQS / RabbitMQ / Google Cloud Pub/Sub |
 | **Inference Workers** | GPU-accelerated compute instances executing the LatentSync pipeline | GPU-enabled Kubernetes Cluster (EKS/GKE) / AWS SageMaker Endpoints |
-| **Model Storage** | Centralized storage for model checkpoints (UNet, VAE, SyncNet, Whisper) and assets | AWS S3 / Google Cloud Storage |
+| **Model Storage** | Centralized storage for model checkpoints (UNet, VAE, SyncNet, Whisper) and assets, model artifacts will be bundled and versioned together as a single logical unit | AWS S3 / Google Cloud Storage |
 | **Output Storage** | Durable object store for generated video files | AWS S3 / Google Cloud Storage |
 | **Cache/Database** | Redis/database instance for job status, metadata, and results | AWS ElastiCache for Redis / Google Memorystore |
 
 ### 2.2 High-Level Architecture
 
 ```mermaid
-graph TB
-    A[User] --> B[API Gateway]
-    B --> C[Request Queue]
-    C --> D[Inference Worker Pool]
-    D --> E[Output Storage]
-    D --> F[Model Storage]
-    D --> G[Job Status DB]
-    
+graph TD
+    subgraph "User Interaction"
+        A[User] --> B[API Gateway];
+    end
+
+    subgraph "Asynchronous Backend"
+        B --> C[Request Queue];
+        C --> D[Worker Pool];
+        
+        subgraph D [Inference Worker Process]
+            direction LR
+            D1[1. Pull Job] --> D2[2. Pre-process Video];
+            D2 --> D3[3. Run LatentSync Diffusion];
+            D3 --> D4[4. Calculate Quality Metrics];
+        end
+
+        D4 --> E[Output Storage];
+        D4 --> G[Job Status DB];
+        D --> F[Model Storage];
+    end
+
     style D fill:#e1f5fe
     style F fill:#f3e5f5
     style E fill:#e8f5e8
@@ -63,7 +76,7 @@ Our profiling results are critical for hardware selection:
 | Configuration | Memory Requirement | Hardware Impact |
 |---------------|-------------------|-----------------|
 | **Baseline (Unoptimized)** | 11.24 GB VRAM | Requires expensive high-end GPUs (A100) |
-| **Optimized (Test 3B)** | 4.02 GB VRAM | Enables cost-effective mid-tier GPUs |
+| **Optimized (Test 2B)** | 4.02 GB VRAM | Enables cost-effective mid-tier GPUs |
 
 **Hardware Recommendation:**
 - **Primary Choice:** NVIDIA L4 Tensor Core GPU (24GB) or T4 Tensor Core GPU (16GB)
@@ -84,9 +97,11 @@ A robust production system must anticipate and handle failures gracefully:
 |--------------|-------|-------------------|
 | **GPU Worker Crash** | CUDA OOM, driver issues, hardware failure | **Health Checks & Auto-Healing:** Kubernetes performs regular health checks. Failed workers are automatically terminated and replaced. Jobs are re-queued. |
 | **Invalid User Input** | Corrupt video, unsupported format, no detectable face | **Input Validation:** API Gateway performs rigorous validation. Invalid jobs rejected immediately with clear error messages (400 Bad Request). |
+| **Pre-processing Failure** | Face detection fails; video frames are corrupt or have unusual angles | Implement a robust recovery and rejection policy. For transient failures (e.g., face not detected for a few frames), use the last known-good face position to continue processing. If the failure is critical (e.g., no face detected in the first 50 frames), reject the job and move it to the DLQ with a specific error code. |
 | **Model Loading Failure** | Corrupt checkpoint, network issues | **Startup Probes & Retries:** Workers verify model loading before marking "Ready". Exponential backoff retry for asset downloads. |
 | **Downstream Service Failure** | Storage or database unavailable | **Dead-Letter Queue (DLQ):** Failed jobs moved to DLQ after retries. Manual inspection prevents infinite blocking. |
 | **"Poison Pill" Job** | Specific input consistently crashes workers | **DLQ + Alerting:** DLQ size alerts notify engineers of potential poison pills requiring offline analysis. |
+
 
 ## 5. Monitoring & Alerting
 
@@ -110,7 +125,7 @@ Continuous monitoring is essential for maintaining service health and performanc
 
 **Metrics Tracked:**
 - End-to-end job processing time (from queue to completion)
-- LSE-D and PSNR/SSIM scores per job
+- Sync_conf, FVD, and FID/SSIM scores per job (in line with paper)
 - Job success/failure rates
 
 **Tools:** Custom logging to centralized services like Datadog, Splunk, or ELK Stack. Log key metrics at each stage of the pipeline (01|init-components, 04|run-pipeline, etc.)
@@ -118,7 +133,7 @@ Continuous monitoring is essential for maintaining service health and performanc
 **Critical Alerts:**
 - Alert if average job processing time exceeds 5-minute SLA
 - Alert if job failure rate exceeds defined threshold (e.g., 5% over 15-minute window)
-- Alert on significant increase in average LSE-D score (could indicate "bad" model deployment)
+- Alert on significant decrease in average Sync_conf score or increase in FVD (could indicate a 'bad' model deployment or a problem with the pipeline)
 
 ### 5.3 Queue Monitoring
 
@@ -188,8 +203,14 @@ jobs:
         run: docker build -t latentsync:${{ github.sha }} .
       - name: Security Scan
         run: docker scan latentsync:${{ github.sha }}
-      - name: Run Tests
-        run: docker run --rm latentsync:${{ github.sha }} pytest
+      - name: Run Unit Tests
+              run: docker run --rm latentsync:${{ github.sha }} pytest
+            - name: Run Model Smoke Test
+              run: |
+                docker run --gpu=1 --rm latentsync:${{ github.sha }} \
+                python tools/run_smoke_test.py --expected_sync_conf 8.5 --expected_fvd 200
+
+        
 ```
 
 **Continuous Deployment:**
@@ -227,7 +248,7 @@ jobs:
 |--------|--------|-------------|
 | **Availability** | 99.9% uptime | Service health monitoring |
 | **Latency** | 95% of jobs < 5 minutes | End-to-end processing time |
-| **Quality** | LSE-D score consistency ±5% | Per-job quality metrics |
+| **Quality** | Avg. Sync_conf score > 8.5<br>Avg. FVD score < 200 | Per-job quality metrics |
 | **Cost Efficiency** | <$0.50 per generated video | Resource utilization tracking |
 
 ## 9. Risk Assessment
