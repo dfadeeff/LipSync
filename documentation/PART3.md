@@ -39,9 +39,9 @@ graph TD
         
         subgraph D [Inference Worker Process]
             direction LR
-            D1[1. Pull Job] --> D2[2. Pre-process Video];
-            D2 --> D3[3. Run LatentSync Diffusion];
-            D3 --> D4[4. Calculate Quality Metrics];
+            D1["Pull Job"] --> D2["Pre-process Video"];
+            D2 --> D3["Run LatentSync Diffusion"];
+            D3 --> D4["Calculate Quality Metrics"];
         end
 
         D4 --> E[Output Storage];
@@ -187,28 +187,35 @@ Continuous monitoring is essential for maintaining service health and performanc
 **Continuous Integration:**
 ```yaml
 # Example GitHub Actions workflow
+# Example GitHub Actions workflow
 name: LatentSync CI/CD
+
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Build Docker Image
         run: docker build -t latentsync:${{ github.sha }} .
+
       - name: Security Scan
         run: docker scan latentsync:${{ github.sha }}
+
       - name: Run Unit Tests
-              run: docker run --rm latentsync:${{ github.sha }} pytest
-            - name: Run Model Smoke Test
-              run: |
-                docker run --gpu=1 --rm latentsync:${{ github.sha }} \
-                python tools/run_smoke_test.py --expected_sync_conf 8.5 --expected_fvd 200
+        run: docker run --rm latentsync:${{ github.sha }} pytest
+
+      - name: Run Model Smoke Test
+        run: |
+          docker run --gpus=all --rm latentsync:${{ github.sha }} \
+          python tools/run_smoke_test.py --expected_sync_conf 8.5 --expected_fvd 200
 
         
 ```
