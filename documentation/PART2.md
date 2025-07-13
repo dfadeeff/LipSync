@@ -303,4 +303,4 @@ This breaks the problem into two simpler, more controllable components.
 - **LSE-D**: Lower scores indicate better lip-sync quality
 - **SyncAcc**: Higher percentages indicate better synchronization accuracy
 - **Search Window**: Current implementation uses ±3 frames for temporal search
-- **Architecture**: StableSyncNet with 1024-dimensional embedding space for audio-visual comparison
+- **Architecture**: StableSyncNet with 2048-dimensional embedding space for audio-visual comparison
