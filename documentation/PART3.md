@@ -187,7 +187,7 @@ Continuous monitoring is essential for maintaining service health and performanc
 **Continuous Integration:**
 ```yaml
 # Example GitHub Actions workflow
-# Example GitHub Actions workflow
+
 name: LatentSync CI/CD
 
 on:
